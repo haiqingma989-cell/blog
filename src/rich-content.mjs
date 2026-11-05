@@ -3,9 +3,9 @@ let serial = 0;
 export async function enhanceContent(root = document) {
   for (const pre of root.querySelectorAll('pre:has(>code)')) {
     if (pre.querySelector('.copy-code')) continue;
-    const button = document.createElement('button');button.className='copy-code';button.type='button';button.textContent='复制';
-    button.setAttribute('aria-label','复制这段代码');
-    button.addEventListener('click',async()=>{try {await navigator.clipboard.writeText(pre.querySelector('code').textContent);button.textContent='已复制';setTimeout(()=>button.textContent='复制',1500);}catch {button.textContent='请选中复制';}});
+    const button = document.createElement('button');button.className='copy-code';button.type='button';button.textContent='Copy';
+    button.setAttribute('aria-label','Copy this code');
+    button.addEventListener('click',async()=>{try {await navigator.clipboard.writeText(pre.querySelector('code').textContent);button.textContent='Copied';setTimeout(()=>button.textContent='Copy',1500);}catch {button.textContent='Select to copy';}});
     pre.append(button);
   }
   const diagrams = [...root.querySelectorAll('.mermaid-block')].filter(node => !node.dataset.rendered && !node.dataset.rendering);
@@ -23,8 +23,8 @@ export async function enhanceContent(root = document) {
         const {svg,bindFunctions}=await mermaid.render(`diagram-${++serial}`,source);
         if (!diagram.isConnected) continue;
         diagram.innerHTML=svg;bindFunctions?.(diagram);diagram.dataset.rendered='true';
-      } catch { const hint=document.createElement('small');hint.className='diagram-error';hint.textContent='图表语法暂时无法解析，请检查 Mermaid 代码。';diagram.append(hint);diagram.dataset.rendered='error'; }
+      } catch { const hint=document.createElement('small');hint.className='diagram-error';hint.textContent='Diagram could not be parsed. Check the Mermaid source.';diagram.append(hint);diagram.dataset.rendered='error'; }
       delete diagram.dataset.rendering;
     }
-  } catch {for (const node of diagrams) {node.dataset.rendered='error';const hint=document.createElement('small');hint.textContent='图表组件加载失败，代码已保留。';node.append(hint);}}
+  } catch {for (const node of diagrams) {node.dataset.rendered='error';const hint=document.createElement('small');hint.textContent='Diagram preview unavailable. The source is preserved.';node.append(hint);}}
 }

@@ -1,16 +1,16 @@
 import {test,expect} from '@playwright/test';
 const sample='## 一段测试记录\n\n公式 $x^2+1$，写给明天。\n\n$$\n\\frac{1}{2}+\\sqrt{3}\n$$\n\n```python\nprint("hello")\n\nprint("world")\n```\n\n```mermaid\ngraph LR\n A[想法]-->B[记录]\n```\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n';
 
-test('Homepage search, category filters, article math and diagrams work',async({page})=>{
+test('English homepage is minimal, readable and retains search and article rendering',async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('');
-  await expect(page.locator('.post-card')).toHaveCount(3);
-  await page.locator('[data-filter="学习笔记"]').click();
-  await expect(page.locator('.post-card:visible')).toHaveCount(1);
-  await page.locator('[data-filter="all"]').click();
+  await expect(page.locator('.post-card')).toHaveCount(4);
+  await expect(page.locator('.sidebar,.hero-art,.cover,.note-banner,.filter-chip')).toHaveCount(0);
+  expect(await page.locator('body').innerText()).not.toMatch(/[\u3400-\u9fff]/);
+  expect(await page.locator('.post-meta').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(14);
   await page.locator('.search-trigger').click();await page.locator('#search-query').fill('LaTeX');
   await expect(page.locator('.search-result')).toHaveCount(1);await page.locator('.search-result').click();
-  await expect(page.locator('.article-title')).toContainText('公式');
+  await expect(page.locator('.article-title')).toContainText('expectation');
   await expect(page.locator('.prose .katex').first()).toBeVisible();
   await page.goto('posts/markdown-writing-guide/');
   await expect(page.locator('.mermaid-block svg')).toBeVisible();
@@ -21,6 +21,8 @@ test('Homepage search, category filters, article math and diagrams work',async({
 test('Writing, visual round trip, autosave, import/export and GitHub handoff preserve content',async({page})=>{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto('editor/');
+  expect(await page.locator('body').innerText()).not.toMatch(/[\u3400-\u9fff]/);
+  await page.locator('.desk-article-settings summary').click();
   await page.locator('#desk-title').fill('我的公式草稿');await page.locator('#desk-slug').fill('formula-draft');
   await page.locator('#desk-source').fill(sample);
   await expect(page.locator('#desk-preview .katex').first()).toBeVisible();
@@ -29,7 +31,7 @@ test('Writing, visual round trip, autosave, import/export and GitHub handoff pre
   await page.locator('[data-mode="source"]').click();
   const roundTrip=await page.locator('#desk-source').inputValue();
   expect(roundTrip).toContain('$x^2+1$');expect(roundTrip).toContain('```python');expect(roundTrip).toContain('```mermaid');expect(roundTrip).toContain('print("hello")\n\nprint("world")');expect(roundTrip).toContain('| A | B |');
-  await expect(page.locator('#desk-save-status')).not.toContainText('未保存');
+  await expect(page.locator('#desk-save-status')).toContainText(/sav/i);
   await page.waitForTimeout(700);await page.reload();await expect(page.locator('#desk-title')).toHaveValue('我的公式草稿');
   await expect(page.locator('#desk-source')).toHaveValue(roundTrip);
   const downloadPromise=page.waitForEvent('download');await page.locator('[data-action="export"]').click();const download=await downloadPromise;expect(download.suggestedFilename()).toBe('formula-draft.md');
@@ -44,8 +46,8 @@ test('Writing, visual round trip, autosave, import/export and GitHub handoff pre
 
 test('Published article can be loaded for editing without overwriting the academic homepage',async({page})=>{
   await page.goto('editor/?post=first-page');
-  await expect(page.locator('#desk-title')).toHaveValue(/从这一页/);
-  await expect(page.locator('#desk-category')).toHaveValue('日常随记');
+  await expect(page.locator('#desk-title')).toHaveValue(/A place for notes/);
+  await expect(page.locator('#desk-category')).toHaveValue('Notes');
   await expect(page.locator('#desk-cover')).toHaveValue('journal');
   await expect(page.locator('#desk-featured')).toBeChecked();
   await expect(page.locator('#desk-unpublished')).not.toBeChecked();

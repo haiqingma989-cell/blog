@@ -4,7 +4,7 @@ import { enhanceContent } from './rich-content.mjs';
 import './editor.css';
 
 const mount = document.getElementById('editor-app');
-if (!mount) throw new Error('找不到写作工作台容器。');
+if (!mount) throw new Error('Editor container not found.');
 
 let config = {};
 try { config = JSON.parse(document.getElementById('site-config')?.textContent || '{}'); }
@@ -18,49 +18,50 @@ const state = { drafts: [], activeId: '', mode: 'source', view: 'write', dirty: 
 let saveTimer, previewTimer, toastTimer, renderSequence = 0, selectionRange;
 let lastStorageError = '';
 
+document.documentElement.lang = 'en';
 document.body.classList.add('is-writing');
 mount.innerHTML = `
   <div class="writing-app">
     <header class="desk-header">
-      <div class="desk-identity"><a class="desk-back" id="desk-back" aria-label="返回博客">← <span>返回博客</span></a><span class="desk-divider"></span><div><span class="desk-eyebrow">A SPACE FOR YOUR WORDS</span><h1>写作工作台<span class="desk-title-dot">.</span></h1></div></div>
-      <div class="desk-header-actions"><span class="desk-save-status" id="desk-save-status" role="status" aria-live="polite" data-state="saved">草稿保存在此浏览器</span><button class="desk-button desk-publish" type="button" data-action="publish"><span aria-hidden="true">↗</span> 发布到 GitHub</button></div>
+      <div class="desk-identity"><a class="desk-back" id="desk-back" aria-label="Back to blog">← <span>Back to blog</span></a><span class="desk-divider"></span><div><span class="desk-eyebrow">WRITING DESK</span><h1>Editor<span class="desk-title-dot">.</span></h1></div></div>
+      <div class="desk-header-actions"><span class="desk-save-status" id="desk-save-status" role="status" aria-live="polite" data-state="saved">Drafts saved in this browser</span><button class="desk-button desk-publish" type="button" data-action="publish"><span aria-hidden="true">↗</span> Publish</button></div>
     </header>
-    <nav class="desk-actions" aria-label="文章操作">
-      <div class="desk-action-group"><button class="desk-button" type="button" data-action="drafts">▤ <span>我的草稿</span><span class="desk-count" id="desk-draft-count">1</span></button><button class="desk-button" type="button" data-action="new">＋ 新建</button><span class="desk-action-separator"></span><button class="desk-button" type="button" data-action="import">导入 Markdown</button><button class="desk-button" type="button" data-action="export">导出 .md</button></div>
-      <div class="desk-mode-switch" role="group" aria-label="编辑方式"><button type="button" data-mode="source" aria-pressed="true">Markdown</button><button type="button" data-mode="visual" aria-pressed="false">可视化</button></div>
+    <nav class="desk-actions" aria-label="Post actions">
+      <div class="desk-action-group"><button class="desk-button" type="button" data-action="drafts">▤ <span>Drafts</span><span class="desk-count" id="desk-draft-count">1</span></button><button class="desk-button" type="button" data-action="new">＋ New</button><span class="desk-action-separator"></span><button class="desk-button" type="button" data-action="import">Import</button><button class="desk-button" type="button" data-action="export">Export .md</button></div>
+      <div class="desk-mode-switch" role="group" aria-label="Editing mode"><button type="button" data-mode="source" aria-pressed="true">Markdown</button><button type="button" data-mode="visual" aria-pressed="false">Visual</button></div>
       <input id="desk-import" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
     </nav>
-    <div class="desk-mobile-tabs" role="group" aria-label="工作区视图"><button type="button" data-view="write" aria-pressed="true">写作</button><button type="button" data-view="preview" aria-pressed="false">预览</button></div>
+    <div class="desk-mobile-tabs" role="group" aria-label="Workspace view"><button type="button" data-view="write" aria-pressed="true">Write</button><button type="button" data-view="preview" aria-pressed="false">Preview</button></div>
     <div class="desk-workspace" data-view="write">
-      <section class="desk-editor-pane" aria-label="文章编辑">
-        <div class="desk-pane-label"><span><i class="desk-indicator"></i> 把想法写下来</span><span class="desk-local-label">LOCAL DRAFT</span></div>
+      <section class="desk-editor-pane" aria-label="Post editor">
+        <div class="desk-pane-label"><span><i class="desk-indicator"></i> Write</span><span class="desk-local-label">LOCAL DRAFT</span></div>
         <div class="desk-metadata">
-          <label class="desk-sr-only" for="desk-title">文章标题</label><input id="desk-title" class="desk-title-input" type="text" maxlength="240" placeholder="一个值得记下的标题…" autocomplete="off">
-          <details class="desk-article-settings" open><summary>文章信息 <span>链接、日期与标签</span></summary><div class="desk-meta-grid">
-            <label class="desk-field desk-slug-field">文章链接 <input id="desk-slug" type="text" maxlength="100" placeholder="a-small-observation" autocomplete="off" spellcheck="false"><span class="desk-field-help">中文、字母、数字或短横线</span></label>
-            <label class="desk-field">发布日期 <input id="desk-date" type="date"></label>
-            <label class="desk-field desk-tags-field">标签 <input id="desk-tags" type="text" placeholder="生活, 技术, 随想" autocomplete="off"><span class="desk-field-help">用逗号分隔，留空也很好</span></label>
-            <label class="desk-field desk-category-field">分类 <input id="desk-category" type="text" placeholder="随手记录" autocomplete="off"></label>
-            <label class="desk-field desk-cover-field">封面地址 <input id="desk-cover" type="text" placeholder="/blog/images/cover.jpg 或原始图片地址" autocomplete="off"><span class="desk-field-help">保持原始资源地址，留空则不设置封面</span></label>
-            <label class="desk-field desk-description-field">简介 <textarea id="desk-description" rows="2" placeholder="给路过的读者，留一句小小的邀请。"></textarea></label>
-            <div class="desk-meta-switches"><label><input id="desk-featured" type="checkbox"> 首页推荐</label><label><input id="desk-unpublished" type="checkbox"> 保留为未发布草稿</label><span>未发布草稿提交后不会显示在博客中。</span></div>
+          <label class="desk-sr-only" for="desk-title">Post title</label><input id="desk-title" class="desk-title-input" type="text" maxlength="240" placeholder="Give this note a title…" autocomplete="off">
+          <details class="desk-article-settings"><summary>Post settings <span>Metadata</span></summary><div class="desk-meta-grid">
+            <label class="desk-field desk-slug-field">Slug <input id="desk-slug" type="text" maxlength="100" placeholder="a-small-observation" autocomplete="off" spellcheck="false"><span class="desk-field-help">Letters, numbers, or hyphens</span></label>
+            <label class="desk-field">Date <input id="desk-date" type="date"></label>
+            <label class="desk-field desk-tags-field">Tags <input id="desk-tags" type="text" placeholder="Life, Technology, Ideas" autocomplete="off"><span class="desk-field-help">Separate with commas</span></label>
+            <label class="desk-field desk-category-field">Category <input id="desk-category" type="text" placeholder="Notes" autocomplete="off"></label>
+            <label class="desk-field desk-cover-field">Cover <input id="desk-cover" type="text" placeholder="/blog/images/cover.jpg or an image URL" autocomplete="off"><span class="desk-field-help">Optional. Original URLs are preserved.</span></label>
+            <label class="desk-field desk-description-field">Description <textarea id="desk-description" rows="2" placeholder="A short introduction for your readers."></textarea></label>
+            <div class="desk-meta-switches"><label><input id="desk-featured" type="checkbox"> Featured</label><label><input id="desk-unpublished" type="checkbox"> Unpublished draft</label><span>Unpublished drafts stay off the blog.</span></div>
           </div></details>
         </div>
-        <div class="desk-toolbar" role="toolbar" aria-label="文字格式">
-          <button type="button" data-format="bold" title="粗体" aria-label="粗体"><b>B</b></button><button type="button" data-format="italic" title="斜体" aria-label="斜体"><i>I</i></button><button type="button" data-format="heading" title="二级标题" aria-label="二级标题">H₂</button><button type="button" data-format="link" title="链接" aria-label="插入链接">↗</button><span class="desk-toolbar-rule"></span><button type="button" data-format="code" title="代码块" aria-label="插入代码块">&lt;/&gt;</button><button type="button" data-format="table" title="表格" aria-label="插入表格">▦</button><span class="desk-toolbar-rule"></span><button type="button" data-format="inline-math" title="行内公式" aria-label="插入行内公式">ƒx</button><button type="button" data-format="block-math" title="独立公式" aria-label="插入独立公式">∑</button><button type="button" data-format="diagram" title="Mermaid 图表" aria-label="插入 Mermaid 图表">◇</button><span class="desk-toolbar-hint">文字，也可以有自己的形状。</span>
+        <div class="desk-toolbar" role="toolbar" aria-label="Formatting">
+          <button type="button" data-format="bold" title="Bold" aria-label="Bold"><b>B</b></button><button type="button" data-format="italic" title="Italic" aria-label="Italic"><i>I</i></button><button type="button" data-format="heading" title="Heading 2" aria-label="Heading 2">H₂</button><button type="button" data-format="link" title="Link" aria-label="Insert link">↗</button><span class="desk-toolbar-rule"></span><button type="button" data-format="code" title="Code block" aria-label="Insert code block">&lt;/&gt;</button><button type="button" data-format="table" title="Table" aria-label="Insert table">▦</button><span class="desk-toolbar-rule"></span><button type="button" data-format="inline-math" title="Inline math" aria-label="Insert inline math">ƒx</button><button type="button" data-format="block-math" title="Display math" aria-label="Insert display math">∑</button><button type="button" data-format="diagram" title="Mermaid diagram" aria-label="Insert Mermaid diagram">◇</button><span class="desk-toolbar-hint"></span>
         </div>
-        <p id="desk-visual-notice" class="desk-visual-notice" role="status" hidden>这篇文章含脚注，已保护为只读预览。请切换 Markdown 修改，原始脚注及引用会完整保留。</p>
-        <label class="desk-sr-only" for="desk-source">Markdown 正文</label><textarea id="desk-source" class="desk-source" spellcheck="false" placeholder="从一个念头开始。\n\n支持 Markdown、代码高亮、LaTeX 公式与 Mermaid 图表。" aria-describedby="desk-edit-help"></textarea>
-        <div id="desk-visual" class="desk-visual prose" contenteditable="true" role="textbox" aria-label="可视化正文编辑" aria-multiline="true" spellcheck="false" data-placeholder="写点什么吧，格式由你决定。" hidden></div>
-        <footer class="desk-editor-footer"><span id="desk-edit-help">支持 Markdown · 公式 · 图表</span><span id="desk-word-count">0 字 · 约 1 分钟</span></footer>
+        <p id="desk-visual-notice" class="desk-visual-notice" role="status" hidden>This post has footnotes. Edit in Markdown to keep every reference intact.</p>
+        <label class="desk-sr-only" for="desk-source">Markdown content</label><textarea id="desk-source" class="desk-source" spellcheck="false" placeholder="Start with a thought.\n\nMarkdown, code, LaTeX, and Mermaid are welcome." aria-describedby="desk-edit-help"></textarea>
+        <div id="desk-visual" class="desk-visual prose" contenteditable="true" role="textbox" aria-label="Visual content editor" aria-multiline="true" spellcheck="false" data-placeholder="Start writing…" hidden></div>
+        <footer class="desk-editor-footer"><span id="desk-edit-help">Markdown · Math · Diagrams</span><span id="desk-word-count">0 words · 1 min read</span></footer>
       </section>
-      <section class="desk-preview-pane" aria-label="文章实时预览">
-        <div class="desk-pane-label"><span><i class="desk-indicator desk-preview-indicator"></i> 读者会看到的样子</span><span>LIVE PREVIEW</span></div>
-        <div class="desk-preview-scroll"><article class="desk-preview-article"><header class="desk-preview-header"><div class="desk-preview-date" id="desk-preview-date"></div><h2 id="desk-preview-title">还没起名的手记</h2><p id="desk-preview-description" hidden></p><div class="desk-preview-tags" id="desk-preview-tags"></div></header><div id="desk-preview" class="prose desk-preview-content"></div></article><div class="desk-preview-end"><span></span><i>写到这里，也很好。</i><span></span></div></div>
+      <section class="desk-preview-pane" aria-label="Live post preview">
+        <div class="desk-pane-label"><span><i class="desk-indicator desk-preview-indicator"></i> Preview</span><span>LIVE PREVIEW</span></div>
+        <div class="desk-preview-scroll"><article class="desk-preview-article"><header class="desk-preview-header"><div class="desk-preview-date" id="desk-preview-date"></div><h2 id="desk-preview-title">Untitled note</h2><p id="desk-preview-description" hidden></p><div class="desk-preview-tags" id="desk-preview-tags"></div></header><div id="desk-preview" class="prose desk-preview-content"></div></article><div class="desk-preview-end"><span></span><i>End of note</i><span></span></div></div>
       </section>
     </div>
-    <dialog class="desk-dialog desk-drafts-dialog" id="desk-drafts-dialog" aria-labelledby="desk-drafts-heading"><div class="desk-dialog-heading"><div><span class="desk-eyebrow">WORDS IN PROGRESS</span><h2 id="desk-drafts-heading">还在生长的草稿</h2></div><button class="desk-icon-button" type="button" data-close="desk-drafts-dialog" aria-label="关闭草稿列表">×</button></div><p class="desk-dialog-note">自动保存在当前浏览器。换设备前，请先导出一份 Markdown。</p><div class="desk-draft-list" id="desk-draft-list"></div><button class="desk-button desk-button-solid" type="button" data-action="new">＋ 写一篇新的</button></dialog>
-    <dialog class="desk-dialog desk-publish-dialog" id="desk-publish-dialog" aria-labelledby="desk-publish-heading"><div class="desk-dialog-heading"><div><span class="desk-eyebrow">LET YOUR WORDS TRAVEL</span><h2 id="desk-publish-heading">把这篇手记，交给读者</h2></div><button class="desk-icon-button" type="button" data-close="desk-publish-dialog" aria-label="关闭发布说明">×</button></div><p class="desk-publish-intro">通过你自己的 GitHub 账号提交。这里不会索取、保存或传送任何访问密钥。</p><div class="desk-publish-file"><span>即将提交</span><strong id="desk-publish-filename"></strong></div><ol class="desk-publish-steps"><li><strong>复制完整文章</strong><p>包含标题、日期、分类、标签、封面和正文，可直接放进仓库。</p><button class="desk-button desk-button-solid" type="button" id="desk-copy-markdown">1. 复制 Markdown</button></li><li><strong id="desk-github-step-title">在 GitHub 创建文章</strong><p>打开页面，粘贴到文件编辑区，检查内容后点击 <b>Commit changes</b>。需要先登录 GitHub，并拥有仓库写入权限。</p><a class="desk-button desk-github-link" id="desk-github-link" target="_blank" rel="noopener noreferrer">2. 打开 GitHub ↗</a></li><li><strong id="desk-publish-deploy-title">等待自动上线</strong><p id="desk-publish-deploy-note">提交成功后，仓库的 GitHub Actions 会构建并部署博客。可以到仓库的 Actions 页面查看进度。</p></li></ol><p class="desk-publish-config" id="desk-publish-config" hidden></p><p class="desk-publish-footnote">这一步会打开 GitHub 供你确认提交，工作台不会直接发布文章。</p></dialog>
+    <dialog class="desk-dialog desk-drafts-dialog" id="desk-drafts-dialog" aria-labelledby="desk-drafts-heading"><div class="desk-dialog-heading"><div><span class="desk-eyebrow">WORDS IN PROGRESS</span><h2 id="desk-drafts-heading">Your drafts</h2></div><button class="desk-icon-button" type="button" data-close="desk-drafts-dialog" aria-label="Close drafts">×</button></div><p class="desk-dialog-note">Saved in this browser. Export a backup before switching devices.</p><div class="desk-draft-list" id="desk-draft-list"></div><button class="desk-button desk-button-solid" type="button" data-action="new">＋ New draft</button></dialog>
+    <dialog class="desk-dialog desk-publish-dialog" id="desk-publish-dialog" aria-labelledby="desk-publish-heading"><div class="desk-dialog-heading"><div><span class="desk-eyebrow">LET YOUR WORDS TRAVEL</span><h2 id="desk-publish-heading">Publish your note</h2></div><button class="desk-icon-button" type="button" data-close="desk-publish-dialog" aria-label="Close publishing instructions">×</button></div><p class="desk-publish-intro">Confirm your submission on GitHub. No access token is needed or stored.</p><div class="desk-publish-file"><span>File</span><strong id="desk-publish-filename"></strong></div><ol class="desk-publish-steps"><li><strong>Copy your post</strong><p>Includes the full post and its metadata.</p><button class="desk-button desk-button-solid" type="button" id="desk-copy-markdown">1. Copy Markdown</button></li><li><strong id="desk-github-step-title">Create the file on GitHub</strong><p>Sign in with repository write access. Paste the Markdown, review it, then choose <b>Commit changes</b>.</p><a class="desk-button desk-github-link" id="desk-github-link" target="_blank" rel="noopener noreferrer">2. Open GitHub ↗</a></li><li><strong id="desk-publish-deploy-title">Automatic deployment</strong><p id="desk-publish-deploy-note">After you commit, GitHub Actions builds and deploys the blog. Check Actions for progress.</p></li></ol><p class="desk-publish-config" id="desk-publish-config" hidden></p><p class="desk-publish-footnote">Nothing is published until you confirm the commit on GitHub.</p></dialog>
     <div class="desk-toast" id="desk-toast" role="status" aria-live="polite" hidden></div>
   </div>`;
 
@@ -122,13 +123,17 @@ function dateToday() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+function formatDate(value) {
+  const date = new Date(String(value).slice(0, 10) + 'T12:00:00Z');
+  return Number.isNaN(date.getTime()) ? String(value) : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(date);
+}
 function makeId() { return globalThis.crypto?.randomUUID?.() || 'draft-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
 function slugify(text) { return String(text).normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 100); }
 function draft() { return state.drafts.find(item => item.id === state.activeId); }
 function normalizeDraft(value = {}) {
   const id = typeof value.id === 'string' ? value.id : makeId();
   const metadataMissing = Array.isArray(value.metadataMissing) ? value.metadataMissing.filter(key => preservedMetadata.includes(key)) : value.sourceSlug ? preservedMetadata.filter(key => !Object.prototype.hasOwnProperty.call(value, key)) : [];
-  return { id, title: String(value.title || ''), slug: String(value.slug || ''), date: /^\d{4}-\d{2}-\d{2}(?:$|[T\s])/.test(value.date) ? value.date.slice(0, 10) : dateToday(), tags: Array.isArray(value.tags) ? value.tags.map(String) : [], category: String(value.category || '随手记录'), cover: String(value.cover || ''), featured: value.featured === true || value.featured === 'true', draft: value.draft === true || value.draft === 'true', description: String(value.description || ''), content: String(value.content || ''), updatedAt: Number(value.updatedAt) || Date.now(), sourceSlug: String(value.sourceSlug || ''), autoSlug: value.autoSlug !== false, metadataMissing };
+  return { id, title: String(value.title || ''), slug: String(value.slug || ''), date: /^\d{4}-\d{2}-\d{2}(?:$|[T\s])/.test(value.date) ? value.date.slice(0, 10) : dateToday(), tags: Array.isArray(value.tags) ? value.tags.map(String) : [], category: String(value.category || 'Notes'), cover: String(value.cover || ''), featured: value.featured === true || value.featured === 'true', draft: value.draft === true || value.draft === 'true', description: String(value.description || ''), content: String(value.content || ''), updatedAt: Number(value.updatedAt) || Date.now(), sourceSlug: String(value.sourceSlug || ''), autoSlug: value.autoSlug !== false, metadataMissing };
 }
 function toast(message, error = false) {
   clearTimeout(toastTimer);
@@ -143,20 +148,20 @@ function persist() {
   try {
     localStorage.setItem(storageKey, JSON.stringify({ version: 1, activeId: state.activeId, drafts: state.drafts }));
     state.dirty = false; state.saved = true; lastStorageError = '';
-    status('已自动保存在此浏览器');
+    status('Saved in this browser');
     $('desk-draft-count').textContent = String(state.drafts.length);
     return true;
   } catch (error) {
     state.saved = false;
-    status('自动保存失败 · 请导出备份', 'error');
-    if (lastStorageError !== error.name) toast('浏览器未能保存草稿，请先导出 Markdown 备份。可能是存储空间不足或隐私设置限制。', true);
+    status('Save failed · Export a backup', 'error');
+    if (lastStorageError !== error.name) toast('This browser could not save your draft. Export a Markdown backup.', true);
     lastStorageError = error.name;
     return false;
   }
 }
 function changed() {
   draft().updatedAt = Date.now(); state.dirty = true;
-  status('正在保存…', 'pending');
+  status('Saving…', 'pending');
   clearTimeout(saveTimer); saveTimer = setTimeout(persist, 500);
   schedulePreview();
 }
@@ -166,7 +171,7 @@ function readFields() {
   current.slug = fields.slug.value.trim();
   current.date = fields.date.value || dateToday();
   current.tags = fields.tags.value.split(/[,，]/).map(tag => tag.trim()).filter(Boolean);
-  current.category = fields.category.value.trim() || '随手记录';
+  current.category = fields.category.value.trim() || 'Notes';
   current.cover = fields.cover.value;
   current.featured = fields.featured.checked;
   current.draft = fields.unpublished.checked;
@@ -195,7 +200,7 @@ function newDraft() {
   flush();
   const current = normalizeDraft();
   state.drafts.push(current); loadDraft(current.id); closeDialog($('desk-drafts-dialog'));
-  setView('write'); fields.title.focus(); toast('已新建草稿，上一篇已经保留。');
+  setView('write'); fields.title.focus(); toast('New draft created. Your previous draft is kept.');
 }
 
 function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(renderPreview, 260); }
@@ -203,27 +208,27 @@ async function renderPreview() {
   clearTimeout(previewTimer);
   const sequence = ++renderSequence;
   const current = draft();
-  $('desk-preview-title').textContent = current.title || '还没起名的手记';
-  $('desk-preview-date').textContent = (current.date || dateToday()).replace(/-/g, ' / ');
+  $('desk-preview-title').textContent = current.title || 'Untitled note';
+  $('desk-preview-date').textContent = formatDate(current.date || dateToday());
   $('desk-preview-description').textContent = current.description;
   $('desk-preview-description').hidden = !current.description;
   $('desk-preview-tags').replaceChildren(...current.tags.map(tag => { const node = document.createElement('span'); node.textContent = tag; return node; }));
-  document.title = (current.title || '写作工作台') + ' · 写作';
+  document.title = (current.title || 'Untitled note') + ' · Editor';
   try {
     const rendered = renderMarkdown(current.content);
-    $('desk-word-count').textContent = `${rendered.wordCount || 0} 字 · 约 ${Math.max(1, rendered.readingMinutes || 1)} 分钟`;
+    $('desk-word-count').textContent = `${rendered.wordCount || 0} words · ${Math.max(1, rendered.readingMinutes || 1)} min read`;
     if (!current.content.trim()) {
       preview.replaceChildren();
       const empty = document.createElement('div'); empty.className = 'desk-preview-empty';
       const mark = document.createElement('span'); mark.className = 'desk-empty-mark'; mark.textContent = '✳';
-      const title = document.createElement('p'); title.textContent = '每一篇好文章，都从一句话开始。';
-      const hint = document.createElement('small'); hint.textContent = '在左边写下你的第一行，预览会在这里慢慢生长。';
+      const title = document.createElement('p'); title.textContent = 'A note starts with one line.';
+      const hint = document.createElement('small'); hint.textContent = 'Start writing to see your preview here.';
       empty.append(mark, title, hint); preview.append(empty); return;
     }
     preview.innerHTML = rendered.html;
     await enhanceContent(preview);
     if (sequence !== renderSequence) return;
-  } catch { if (sequence === renderSequence) toast('预览暂时没有渲染成功，正文仍然保存在编辑区。请检查公式或图表语法。', true); }
+  } catch { if (sequence === renderSequence) toast('Preview failed. Your content is safe; check math or diagram syntax.', true); }
 }
 function protectRichNodes(container) {
   container.querySelectorAll('[data-tex], .katex-display, .katex, [data-mermaid-source], [data-mermaid]').forEach(node => { node.setAttribute('contenteditable', 'false'); if (!node.parentElement?.closest('[data-tex], .katex-display, [data-mermaid-source], [data-mermaid]')) node.setAttribute('tabindex', '0'); });
@@ -238,12 +243,12 @@ async function renderVisual() {
     visual.setAttribute('aria-readonly', String(state.protectedVisual));
     $('desk-visual-notice').hidden = !state.protectedVisual;
     mount.querySelectorAll('[data-format]').forEach(button => { button.disabled = state.protectedVisual; });
-    if (state.protectedVisual) $('desk-edit-help').textContent = '脚注已保护 · 请切换 Markdown 编辑';
+    if (state.protectedVisual) $('desk-edit-help').textContent = 'Footnotes protected · Edit in Markdown';
     else visual.querySelectorAll('input[type="checkbox"]').forEach(input => { input.disabled = false; });
     protectRichNodes(visual);
     await enhanceContent(visual);
     protectRichNodes(visual);
-  } catch { toast('可视化渲染暂时失败，可以继续使用 Markdown 编辑。', true); }
+  } catch { toast('Visual preview failed. You can continue in Markdown.', true); }
 }
 function setMode(mode) {
   if (mode === state.mode) return;
@@ -253,7 +258,7 @@ function setMode(mode) {
   source.hidden = mode !== 'source'; visual.hidden = mode !== 'visual';
   if (mode === 'source') { $('desk-visual-notice').hidden = true; mount.querySelectorAll('[data-format]').forEach(button => { button.disabled = false; }); }
   mount.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === mode)));
-  $('desk-edit-help').textContent = mode === 'visual' ? '公式与图表是受保护的节点，请切换 Markdown 修改' : '支持 Markdown · 公式 · 图表';
+  $('desk-edit-help').textContent = mode === 'visual' ? 'Edit math and diagrams in Markdown' : 'Markdown · Math · Diagrams';
   if (mode === 'visual') { renderVisual(); visual.focus(); }
   else source.focus();
   changed();
@@ -282,7 +287,7 @@ function sourceInsert(before, fallback = '', after = '') {
   draft().content = source.value; changed();
 }
 async function visualInsert(markdown, inline = false) {
-  if (state.protectedVisual) { toast('这篇文章的脚注已保护，请切换 Markdown 修改。'); return; }
+  if (state.protectedVisual) { toast('Footnotes are protected. Switch to Markdown to edit.'); return; }
   restoreSelection();
   const selection = window.getSelection();
   const range = selection?.rangeCount && visual.contains(selection.anchorNode) ? selection.getRangeAt(0) : document.createRange();
@@ -302,22 +307,22 @@ async function visualInsert(markdown, inline = false) {
   if (last) { range.setStartAfter(last); range.collapse(true); selection.removeAllRanges(); selection.addRange(range); }
   rememberSelection(); state.visualDirty = true; syncVisual(); changed();
   try { await enhanceContent(visual); protectRichNodes(visual); }
-  catch { toast('图表未能显示，切换 Markdown 可以检查原始语法。', true); }
+  catch { toast('Diagram preview failed. Check its source in Markdown.', true); }
 }
 function format(kind) {
-  if (state.mode === 'visual' && state.protectedVisual) { toast('这篇文章的脚注已保护，请切换 Markdown 修改。'); return; }
+  if (state.mode === 'visual' && state.protectedVisual) { toast('Footnotes are protected. Switch to Markdown to edit.'); return; }
   const snippets = {
-    code: ['\n\n```javascript\n', 'const hello = "你好，世界";', '\n```\n'],
-    table: ['\n\n', '| 项目 | 说明 |\n| --- | --- |\n| 一个想法 | 从这里开始 |\n', ''],
+    code: ['\n\n```javascript\n', 'const hello = "Hello, world";', '\n```\n'],
+    table: ['\n\n', '| Item | Notes |\n| --- | --- |\n| An idea | Start here |\n', ''],
     'inline-math': ['$', 'E = mc^2', '$'],
     'block-math': ['\n\n$$\n', '\\int_0^1 x^2\\,dx = \\frac{1}{3}', '\n$$\n'],
-    diagram: ['\n\n```mermaid\n', 'flowchart LR\n  A[一个念头] --> B[写下来]\n  B --> C[分享给读者]', '\n```\n']
+    diagram: ['\n\n```mermaid\n', 'flowchart LR\n  A[An idea] --> B[Write it down]\n  B --> C[Share it]', '\n```\n']
   };
   if (state.mode === 'source') {
-    if (kind === 'bold') sourceInsert('**', '加粗文字', '**');
-    else if (kind === 'italic') sourceInsert('*', '斜体文字', '*');
-    else if (kind === 'heading') sourceInsert('\n## ', '一个小标题', '\n');
-    else if (kind === 'link') sourceInsert('[', '链接文字', '](https://example.com)');
+    if (kind === 'bold') sourceInsert('**', 'bold text', '**');
+    else if (kind === 'italic') sourceInsert('*', 'italic text', '*');
+    else if (kind === 'heading') sourceInsert('\n## ', 'A heading', '\n');
+    else if (kind === 'link') sourceInsert('[', 'link text', '](https://example.com)');
     else if (snippets[kind]) sourceInsert(...snippets[kind]);
     return;
   }
@@ -325,10 +330,10 @@ function format(kind) {
   if (kind === 'bold' || kind === 'italic') document.execCommand(kind, false);
   else if (kind === 'heading') document.execCommand('formatBlock', false, 'h2');
   else if (kind === 'link') {
-    const url = window.prompt('输入链接地址（https://…、mailto:… 或站内路径）', 'https://');
+    const url = window.prompt('Enter a URL, email link, or site path', 'https://');
     if (url === null) return;
-    if (!/^(https?:\/\/|mailto:|tel:|#|\/|\.\.?\/)/i.test(url.trim()) || /^\/\//.test(url.trim())) { toast('请输入有效的 HTTPS、邮件地址或站内链接。', true); return; }
-    if (!window.getSelection()?.toString()) visualInsert('[链接文字](' + url.trim().replace(/\)/g, '%29') + ')', true);
+    if (!/^(https?:\/\/|mailto:|tel:|#|\/|\.\.?\/)/i.test(url.trim()) || /^\/\//.test(url.trim())) { toast('Enter a valid URL, email link, or site path.', true); return; }
+    if (!window.getSelection()?.toString()) visualInsert('[link text](' + url.trim().replace(/\)/g, '%29') + ')', true);
     else document.execCommand('createLink', false, url.trim());
   } else if (snippets[kind]) { visualInsert(snippets[kind].join(''), kind === 'inline-math'); return; }
   rememberSelection(); state.visualDirty = true; syncVisual(); changed();
@@ -369,24 +374,24 @@ function parseDocument(text, filename) {
         data[key] = value.trim().startsWith('>') ? block.join(' ').trim() : block.join('\n').trimEnd();
       } else data[key] = unquote(value);
     }
-  } else if (normalized.startsWith('---\n')) toast('没有找到完整的文章信息区，已保留为正文导入。', true);
+  } else if (normalized.startsWith('---\n')) toast('Incomplete frontmatter was kept as content.', true);
   const title = String(data.title || filename.replace(/\.(md|markdown|txt)$/i, ''));
   return normalizeDraft({ ...data, title, slug: data.slug || slugify(title), content, autoSlug: !data.slug });
 }
 function markdownDocument(current = draft()) {
-  const title = current.title.trim() || '未命名手记';
+  const title = current.title.trim() || 'Untitled note';
   const slug = current.slug.trim() || slugify(title) || 'note-' + dateToday();
-  return ['---', 'title: ' + JSON.stringify(title), 'slug: ' + JSON.stringify(slug), 'date: ' + JSON.stringify(current.date || dateToday()), 'category: ' + JSON.stringify(current.category || '随手记录'), 'tags: [' + current.tags.map(tag => JSON.stringify(tag)).join(', ') + ']', 'description: ' + JSON.stringify(current.description || ''), 'featured: ' + String(current.featured === true), 'cover: ' + JSON.stringify(current.cover || ''), 'draft: ' + String(current.draft === true), '---', '', current.content.replace(/\s+$/, ''), ''].join('\n');
+  return ['---', 'title: ' + JSON.stringify(title), 'slug: ' + JSON.stringify(slug), 'date: ' + JSON.stringify(current.date || dateToday()), 'category: ' + JSON.stringify(current.category || 'Notes'), 'tags: [' + current.tags.map(tag => JSON.stringify(tag)).join(', ') + ']', 'description: ' + JSON.stringify(current.description || ''), 'featured: ' + String(current.featured === true), 'cover: ' + JSON.stringify(current.cover || ''), 'draft: ' + String(current.draft === true), '---', '', current.content.replace(/\s+$/, ''), ''].join('\n');
 }
 async function importFile(file) {
   if (!file) return;
-  if (!/\.(md|markdown|txt)$/i.test(file.name)) { toast('请选择 .md、.markdown 或 .txt 文件。', true); return; }
-  if (file.size > 5 * 1024 * 1024) { toast('这篇文章超过 5 MB，请拆分后导入。', true); return; }
+  if (!/\.(md|markdown|txt)$/i.test(file.name)) { toast('Choose a .md, .markdown, or .txt file.', true); return; }
+  if (file.size > 5 * 1024 * 1024) { toast('Files must be under 5 MB.', true); return; }
   try {
     const text = await file.text(); flush();
     const imported = parseDocument(text, file.name); state.drafts.push(imported); loadDraft(imported.id);
-    setView('write'); toast('文章已导入为新草稿，原来的草稿也已保留。');
-  } catch { toast('没有读取到这个文件，请重新选择文件。原草稿仍然保留。', true); }
+    setView('write'); toast('Imported as a new draft. Your other drafts are kept.');
+  } catch { toast('Could not read this file. Your drafts are unchanged.', true); }
   finally { $('desk-import').value = ''; }
 }
 function exportFile() {
@@ -396,8 +401,8 @@ function exportFile() {
     const url = URL.createObjectURL(blob), link = document.createElement('a');
     link.href = url; link.download = (slugify(draft().slug) || slugify(draft().title) || 'untitled-note') + '.md';
     document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast('已导出 Markdown，可带到其他设备继续写。');
-  } catch { toast('文件导出失败，请重试，或用发布窗口复制完整 Markdown。', true); }
+    toast('Markdown exported.');
+  } catch { toast('Export failed. Retry or copy Markdown from the Publish dialog.', true); }
 }
 
 function openDialog(dialog) { if (typeof dialog.showModal === 'function') { if (!dialog.open) dialog.showModal(); } else { dialog.setAttribute('open', ''); dialog.setAttribute('role', 'dialog'); } }
@@ -408,16 +413,16 @@ function showDrafts() {
   [...state.drafts].sort((a, b) => b.updatedAt - a.updatedAt).forEach(item => {
     const row = document.createElement('div'); row.className = 'desk-draft-row'; row.dataset.active = String(item.id === state.activeId);
     const button = document.createElement('button'); button.type = 'button'; button.className = 'desk-draft-open';
-    const title = document.createElement('strong'); title.textContent = item.title || '未命名手记';
-    const meta = document.createElement('span'); meta.textContent = `${item.date} · ${item.content.trim() ? item.content.replace(/[#*`$>]/g, '').slice(0, 44).replace(/\n/g, ' ') : '等待第一句话'}`;
-    button.append(title, meta); button.addEventListener('click', () => { loadDraft(item.id); closeDialog($('desk-drafts-dialog')); toast('已切换草稿。'); });
-    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'desk-draft-delete'; remove.textContent = '删除'; remove.setAttribute('aria-label', '删除草稿：' + (item.title || '未命名手记'));
+    const title = document.createElement('strong'); title.textContent = item.title || 'Untitled note';
+    const meta = document.createElement('span'); meta.textContent = `${formatDate(item.date)} · ${item.content.trim() ? item.content.replace(/[#*`$>]/g, '').slice(0, 44).replace(/\n/g, ' ') : 'No content yet'}`;
+    button.append(title, meta); button.addEventListener('click', () => { loadDraft(item.id); closeDialog($('desk-drafts-dialog')); toast('Draft opened.'); });
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'desk-draft-delete'; remove.textContent = 'Delete'; remove.setAttribute('aria-label', 'Delete draft: ' + (item.title || 'Untitled note'));
     remove.addEventListener('click', () => {
-      if (!window.confirm('删除“' + (item.title || '未命名手记') + '”的本地草稿？删除后无法恢复，请先确认已经导出。')) return;
+      if (!window.confirm('Delete "' + (item.title || 'Untitled note') + '" from this browser? This cannot be undone. Export a backup first.')) return;
       state.drafts = state.drafts.filter(current => current.id !== item.id);
       if (!state.drafts.length) state.drafts.push(normalizeDraft());
       if (state.activeId === item.id) loadDraft(state.drafts[0].id);
-      persist(); showDrafts(); toast('这篇本地草稿已删除。');
+      persist(); showDrafts(); toast('Local draft deleted.');
     });
     row.append(button, remove); list.append(row);
   });
@@ -426,18 +431,18 @@ function showDrafts() {
 function publish() {
   flush();
   const current = draft();
-  if (current.metadataMissing.length) { toast('这篇旧草稿的原文章信息尚未补全。请联网重新打开原文章后再提交，避免丢失分类、推荐或封面。', true); return; }
-  $('desk-copy-markdown').textContent = '1. 复制 Markdown';
-  $('desk-publish-deploy-title').textContent = current.draft ? '这篇文章将保留为未发布草稿' : '等待自动上线';
-  $('desk-publish-deploy-note').textContent = current.draft ? '当前已开启“保留为未发布草稿”。提交后文件会保存在仓库，但不会出现在博客。准备公开时，关闭这一标记后再次提交。' : '提交成功后，仓库的 GitHub Actions 会构建并部署博客。可以到仓库的 Actions 页面查看进度。';
-  if (!current.title.trim() || !current.content.trim()) { toast('发布前，请先写下文章标题和正文。', true); setView('write'); (!current.title.trim() ? fields.title : state.mode === 'source' ? source : visual).focus(); return; }
-  if (!slugPattern.test(current.slug)) { toast('文章链接需要 1–100 个中文、字母、数字或短横线，并以文字或数字开头。', true); setView('write'); fields.slug.focus(); return; }
+  if (current.metadataMissing.length) { toast('Reconnect and reopen this post to restore missing metadata before publishing.', true); return; }
+  $('desk-copy-markdown').textContent = '1. Copy Markdown';
+  $('desk-publish-deploy-title').textContent = current.draft ? 'Keep this post unpublished' : 'Automatic deployment';
+  $('desk-publish-deploy-note').textContent = current.draft ? 'Unpublished draft is enabled. The file will be saved in the repository but hidden from the blog. Turn this off and commit again to publish.' : 'After you commit, GitHub Actions builds and deploys the blog. Check Actions for progress.';
+  if (!current.title.trim() || !current.content.trim()) { toast('Add a title and some content before publishing.', true); setView('write'); (!current.title.trim() ? fields.title : state.mode === 'source' ? source : visual).focus(); return; }
+  if (!slugPattern.test(current.slug)) { toast('Use 1–100 letters, numbers, or hyphens for the slug. Start with a letter or number.', true); setView('write'); fields.slug.focus(); return; }
   const github = config.github || {}, owner = String(github.owner || ''), repo = String(github.repo || ''), branch = String(github.branch || 'main');
   const configured = /^[\w.-]+$/.test(owner) && /^[\w.-]+$/.test(repo) && owner !== '..' && repo !== '..' && branch.length > 0;
   const link = $('desk-github-link'), warning = $('desk-publish-config');
   $('desk-publish-filename').textContent = 'content/posts/' + current.slug + '.md';
   const update = current.sourceSlug === current.slug;
-  $('desk-github-step-title').textContent = update ? '在 GitHub 更新这篇文章' : '在 GitHub 创建文章';
+  $('desk-github-step-title').textContent = update ? 'Update the file on GitHub' : 'Create the file on GitHub';
   if (configured) {
     const repoPath = 'https://github.com/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repo);
     const branchPath = encodeURIComponent(branch);
@@ -445,7 +450,7 @@ function publish() {
     link.removeAttribute('aria-disabled'); warning.hidden = true;
   } else {
     link.removeAttribute('href'); link.setAttribute('aria-disabled', 'true'); warning.hidden = false;
-    warning.textContent = '博客还没有配置 GitHub 仓库。你仍可复制或导出文章；请在站点配置中填写 github.owner、github.repo 和 github.branch 后再提交。';
+    warning.textContent = 'Configure github.owner, github.repo, and github.branch before publishing. You can still copy or export your post.';
   }
   openDialog($('desk-publish-dialog'));
 }
@@ -461,20 +466,20 @@ async function copyMarkdown() {
       const copied = document.execCommand('copy'); area.remove(); $('desk-copy-markdown').focus();
       if (!copied) throw new Error('Clipboard unavailable');
     }
-    $('desk-copy-markdown').textContent = '✓ 已复制完整 Markdown';
-    toast('已复制。到 GitHub 粘贴正文，确认后提交即可。');
-  } catch { toast('浏览器未允许复制，请关闭发布窗口，导出 .md 后复制文件中的完整内容。', true); }
+    $('desk-copy-markdown').textContent = '✓ Markdown copied';
+    toast('Copied. Paste it on GitHub, review, and commit.');
+  } catch { toast('Clipboard access failed. Export a .md file and copy its contents instead.', true); }
 }
 
 async function loadPublished() {
   const slug = new URLSearchParams(location.search).get('post');
   if (!slug) return;
-  if (!slugPattern.test(slug)) { toast('文章链接格式不正确，已恢复本地草稿。', true); return; }
+  if (!slugPattern.test(slug)) { toast('Invalid post slug. Your local draft is restored.', true); return; }
   const existing = state.drafts.find(item => item.sourceSlug === slug);
   if (existing) {
     flush(); loadDraft(existing.id);
-    if (!existing.metadataMissing.length) { toast('已恢复这篇文章的本地草稿，没有覆盖你的修改。'); return; }
-    toast('已恢复本地正文，正在补全原文章的分类与封面等信息。');
+    if (!existing.metadataMissing.length) { toast('Local draft restored. Your edits are kept.'); return; }
+    toast('Draft restored. Loading missing post metadata…');
   }
   const activeAtRequest = state.activeId;
   const updatedAtRequest = draft().updatedAt;
@@ -496,13 +501,13 @@ async function loadPublished() {
           else field.value = existing[key];
         }
       }
-      persist(); toast('原文章信息已补全，本地正文和你的修改都已保留。'); return;
+      persist(); toast('Metadata restored. Your local edits are kept.'); return;
     }
     const imported = normalizeDraft({ ...article, sourceSlug: slug, slug: article.slug || slug, autoSlug: false });
     state.drafts.push(imported);
-    if (state.activeId === activeAtRequest && draft().updatedAt === updatedAtRequest) { flush(); loadDraft(imported.id); toast('已载入文章，可继续编辑并到 GitHub 提交更新。'); }
-    else { persist(); toast('文章已加入“我的草稿”，没有打断你正在写的内容。'); }
-  } catch { toast('没有载入这篇已发布文章，请检查链接或网络。本地草稿不受影响。', true); }
+    if (state.activeId === activeAtRequest && draft().updatedAt === updatedAtRequest) { flush(); loadDraft(imported.id); toast('Post loaded. Submit your edits on GitHub when ready.'); }
+    else { persist(); toast('Post added to Drafts. Your current work is unchanged.'); }
+  } catch { toast('Could not load this post. Check the link or connection. Local drafts are unchanged.', true); }
 }
 
 Object.entries(fields).forEach(([key, field]) => field.addEventListener('input', () => {
@@ -516,11 +521,11 @@ source.addEventListener('input', () => { draft().content = source.value; changed
 source.addEventListener('keydown', event => { if (event.key === 'Tab') { event.preventDefault(); sourceInsert('  '); } });
 visual.addEventListener('input', () => { if (state.protectedVisual) return; state.visualDirty = true; syncVisual(); changed(); });
 visual.addEventListener('keyup', rememberSelection); visual.addEventListener('mouseup', rememberSelection); visual.addEventListener('focusout', rememberSelection);
-visual.addEventListener('paste', event => { event.preventDefault(); if (state.protectedVisual) { toast('这篇文章的脚注已保护，请切换 Markdown 修改。'); return; } document.execCommand('insertText', false, event.clipboardData?.getData('text/plain') || ''); state.visualDirty = true; syncVisual(); changed(); });
-visual.addEventListener('drop', event => { event.preventDefault(); if (state.protectedVisual) { toast('这篇文章的脚注已保护，请切换 Markdown 修改。'); return; } document.execCommand('insertText', false, event.dataTransfer?.getData('text/plain') || ''); state.visualDirty = true; syncVisual(); changed(); });
+visual.addEventListener('paste', event => { event.preventDefault(); if (state.protectedVisual) { toast('Footnotes are protected. Switch to Markdown to edit.'); return; } document.execCommand('insertText', false, event.clipboardData?.getData('text/plain') || ''); state.visualDirty = true; syncVisual(); changed(); });
+visual.addEventListener('drop', event => { event.preventDefault(); if (state.protectedVisual) { toast('Footnotes are protected. Switch to Markdown to edit.'); return; } document.execCommand('insertText', false, event.dataTransfer?.getData('text/plain') || ''); state.visualDirty = true; syncVisual(); changed(); });
 visual.addEventListener('click', event => {
   if (event.target.closest('a')) event.preventDefault();
-  if (event.target.closest('[data-tex], .katex, [data-mermaid-source], [data-mermaid]')) toast('公式和图表已保护，切换到 Markdown 可以修改原始内容。');
+  if (event.target.closest('[data-tex], .katex, [data-mermaid-source], [data-mermaid]')) toast('Switch to Markdown to edit this math or diagram.');
 });
 mount.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
 mount.querySelectorAll('button[data-view]').forEach(button => button.addEventListener('click', () => setView(button.dataset.view)));
@@ -535,7 +540,7 @@ $('desk-github-link').addEventListener('click', event => { if (event.currentTarg
 mount.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => closeDialog($(button.dataset.close))));
 mount.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('click', event => { if (event.target === dialog) { const rect = dialog.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog(dialog); } }));
 document.addEventListener('keydown', event => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); flush(); if (state.saved) toast('草稿已保存在此浏览器。'); }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); flush(); if (state.saved) toast('Draft saved in this browser.'); }
   if (event.key === 'Escape') mount.querySelectorAll('dialog[open]').forEach(closeDialog);
 });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
@@ -547,7 +552,7 @@ try {
     state.drafts = saved.drafts.filter(item => item && typeof item === 'object').map(normalizeDraft);
     state.activeId = state.drafts.some(item => item.id === saved.activeId) ? saved.activeId : state.drafts[0]?.id || '';
   }
-} catch { toast('没有读取到浏览器里的旧草稿。可以导入之前导出的 Markdown 继续写作。', true); }
+} catch { toast('Could not read saved drafts. You can import a Markdown backup.', true); }
 if (!state.drafts.length) { const first = normalizeDraft(); state.drafts.push(first); state.activeId = first.id; }
 loadDraft(state.activeId);
 loadPublished();

@@ -1,33 +1,29 @@
 ---
-title: "把想法写成公式：我的第一篇数学笔记"
+title: "A short note on expectation"
 slug: "first-math-note"
 date: "2026-11-05"
-category: "学习笔记"
-tags: ["LaTeX", "数学", "示例"]
-description: "用一个小小的奖励模型练习行内公式、矩阵、分段函数、期望和梯度，给每个符号写明含义。"
+category: "Learning"
+tags: ["Math", "LaTeX", "Example"]
+description: "A small worked example of expectation, with vectors and a gradient check."
 featured: false
 cover: "math"
 ---
 
-> **示例数学笔记。** 下面的模型仅用于练习公式排版与基础推导，不对应任何实际产品的奖励算法。
+> **Example.** A few calculations for practicing mathematical notation.
 
-## 先定义一个可以算清楚的问题
+## Define the outcome
 
-假设一次练习的结果只有成功与未成功两种。用随机变量 $X$ 表示得分，成功概率为 $p$，其中 $0\le p\le 1$。先把规则写成分段函数：
+Suppose a trial succeeds with probability $p$, where $0\le p\le 1$. Let the score $X$ follow this rule:
 
 $$
 X=
 \begin{cases}
-10, & \text{成功},\\
-2, & \text{未成功}.
+10, & \text{on success},\\
+2, & \text{otherwise}.
 \end{cases}
 $$
 
-“未成功也有两分”是我给这个例子选的规则，不是概率论的要求。它提醒我先分清：哪些是定义，哪些才是根据定义算出的结论。
-
-### 从概率走到期望
-
-期望是不同结果按概率加权后的平均值，因此
+The scores are chosen for this example. Expectation weights each outcome by its probability:
 
 $$
 \mathbb{E}[X]
@@ -35,13 +31,15 @@ $$
 =2+8p.
 $$
 
-当 $p=0.6$ 时，期望为 $6.8$ 分。这不表示某一次真的会得到 $6.8$ 分；单次仍然只能是 $10$ 或 $2$。期望描述的是重复进行同类试验时的平均水平。把这一句写在公式旁边，比只记住计算步骤更有用。
+At $p=0.6$, the expected score is $6.8$. A single trial still scores either $10$ or $2$; the expectation describes an average, not another possible outcome.
 
-我还会代入边界检查：当 $p=0$ 时，得分总是两分；当 $p=1$ 时，得分总是十分；当 $p=0.5$ 时，两种结果等概率，期望应当是六分。这些小检查能帮助我发现把成功与失败的概率写反之类的错误。
+Repeating independent trials with the same probability gives the expectation a practical interpretation: their average approaches this value as the number of trials grows.
 
-## 用矩阵和梯度检查变化
+Check the boundaries: $p=0$ gives $2$, and $p=1$ gives $10$. At $p=0.5$, the two outcomes are equally likely, so their average is $6$. These checks help catch a reversed probability.
 
-如果同时记录好感与信任两个状态，可以把它们排成列向量。下面的数字只为演示矩阵加法，并不对应实际游戏数值：
+## Keep two coordinates together
+
+Column vectors group quantities that change together. Add matching coordinates:
 
 $$
 \mathbf{s}
@@ -54,11 +52,11 @@ $$
 =\begin{bmatrix}12\\24\end{bmatrix}.
 $$
 
-矩阵没有让这次加法更神奇，它只是把两个同时变化的量放在同一个记号里。我需要记住每一行代表什么，也要检查向量维度一致，才能继续计算。
+The notation is compact, but each row still needs a meaning. Check that the dimensions agree before adding vectors.
 
-### 一个能亲手验证的梯度
+## Check one gradient step
 
-再取一个简单目标函数 $L(a,b)=(a-1)^2+(b-2)^2$。分别对两个变量求偏导，得到
+For a separate example, take $L(a,b)=(a-1)^2+(b-2)^2$. Differentiating each coordinate gives:
 
 $$
 \nabla L(a,b)
@@ -68,8 +66,8 @@ $$
 \end{bmatrix}.
 $$
 
-在 $(a,b)=(0,0)$ 处，梯度是 $(-2,-4)$。沿负梯度方向，以步长 $\eta=0.1$ 更新一次，位置变成 $(0.2,0.4)$；代回原式，$L$ 从 $5$ 下降到 $3.2$。这里可以直接用四则运算检查结果，不必先相信一个抽象术语。
+At $(0,0)$, the gradient is $(-2,-4)$. A step of size $\eta=0.1$ in the negative gradient direction reaches $(0.2,0.4)$. Substitution shows that $L$ falls from $5$ to $3.2$.
 
-本例中，两个平方都非负，所以 $L$ 的最小值是零，在 $(1,2)$ 处取得。那里梯度也恰好为零。这能验证本次计算，但不能据此认为所有函数的零梯度点都是最小值，也不能认为任意步长都能让目标下降。
+For this quadratic, a small step reduces the error. A larger step can overshoot, so the calculation above checks this update rather than every possible step size.
 
-这篇笔记暂时只做到这里。下次复习，我会先遮住答案重新算一次，再检查自己能否说明期望为什么不是单次得分，以及梯度的每个分量究竟对谁求导。
+Both squares are nonnegative, so this function reaches its minimum of zero at $(1,2)$. That conclusion follows from this particular function; a zero gradient does not guarantee a minimum in general.

@@ -1,8 +1,8 @@
 export default {
-  title: '海青马的手记',
-  author: '海青马',
+  title: 'Haiqingma — Notes',
+  author: 'Haiqingma',
   englishName: 'HAIQINGMA',
-  description: '记录学习、代码，和生活里的小小发现。',
+  description: 'Learning, code, and everyday life.',
   url: 'https://haiqingma989-cell.github.io/blog',
   basePath: '/blog/',
   github: { owner: 'haiqingma989-cell', repo: 'blog', branch: 'main' },

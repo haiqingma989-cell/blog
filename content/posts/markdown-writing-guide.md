@@ -1,68 +1,66 @@
 ---
-title: "让笔记不止有文字：Markdown 写作指南"
+title: "Writing with Markdown"
 slug: "markdown-writing-guide"
 date: "2026-11-05"
-category: "写作与工具"
-tags: ["Markdown", "写作", "示例"]
-description: "一篇明确标注的排版示例：用标题、表格、任务清单、代码、脚注和图片，把一段笔记写清楚。"
+category: "Writing"
+tags: ["Markdown", "Example"]
+description: "A practical example of headings, tables, code, footnotes, images, and diagrams."
 featured: false
 cover: "writing"
 ---
 
-> **示例文章。** 本文用于演示博客的 Markdown 排版，不是软件评测，也不代表下列任务已经完成。
+> **Example.** A quick tour of the Markdown supported on this blog.
 
-## 先把结构写出来
+## Give the page a structure
 
-我会先用二级标题划分主题，再用三级标题记录具体操作。标题最好能回答一个问题，例如“怎么复现”，比“其他内容”更方便以后查找。**粗体**留给关键结论，*斜体*偶尔强调语气，行内代码如 `npm run dev` 则表示需要原样输入的内容。
+Use a heading that tells the reader what comes next. Keep paragraphs focused on one idea. Save **bold** for a useful point, *italics* for a little emphasis, and inline code such as `npm run dev` for exact text.
 
-### 用表格比较，用清单行动
+### Tables and tasks
 
-信息并列时可以用表格。它适合几项简短属性，不适合把整段文章塞进格子。
+A table helps compare short items. Put longer explanations in the surrounding text so the page stays easy to read on a phone.
 
-| 内容 | 适合的写法 | 用途 |
+| Content | Format | Purpose |
 | --- | --- | --- |
-| 开发步骤 | 有序列表 | 按顺序复现 |
-| 今日计划 | 任务清单 | 看清下一步 |
-| 参数说明 | 表格 | 快速比较 |
+| Steps | Numbered list | Follow an order |
+| Plans | Checklist | Track the next action |
+| Settings | Table | Compare values |
 
-- [x] 写下这次想解决的问题
-- [x] 保存一个最小示例
-- [ ] 运行示例并补上实际结果
+- [x] Describe the question
+- [x] Add a small example
+- [ ] Check the result
 
-## 把材料和判断分开
+## Keep examples readable
 
-引用块可以收起一段值得反复提醒自己的话。这里是我为本页写的句子，不是外部引文：
+A blockquote can set a short note apart:
 
-> 先写清楚一件小事，再慢慢连接成一篇文章。
+> Start with one clear example.
 
-代码使用围栏，并注明语言。下面演示 JavaScript 怎样为一条笔记添加标签：
+Use a fenced block for code and name its language. This JavaScript example prints a note title:
 
 ```javascript
 const note = {
-  title: "今天学到的一件事",
-  tags: ["笔记", "示例"],
+  title: "A useful note",
+  tags: ["Notes", "Example"],
 };
 console.log(note.title);
 ```
 
-如果解释会打断正文，可以放进脚注，正文只保留入口。[^draft]
+Move a small aside into a footnote when it would interrupt the explanation.[^draft]
 
-## 给图片一个具体的说明
+## Add a picture or a process
 
-图片也需要文字。描述画面比写“配图”更有帮助；读不到图片时，读者仍能知道这里想表达什么。以下图片用于演示图片引用：
+Give an image descriptive alt text so its purpose is still clear when the image cannot load.
 
-![纸页、铅笔与一片叶子，作为手记排版示例](/images/notebook.svg)
+![A notebook, pencil, and leaf](/images/notebook.svg)
 
-写完以后，我会回到预览检查标题、链接和代码是否清楚。Markdown 帮我保存结构，内容是否讲明白，仍需要自己读一遍。
-
-## 把流程画出来
-
-也可以用 Mermaid 画一个简单的写作流程：
+For a short sequence, Mermaid can make the connections easier to see:
 
 ```mermaid
 graph LR
- A[写下想法] --> B[检查预览]
- B --> C[提交文章]
+ A[Draft] --> B[Preview]
+ B --> C[Publish]
 ```
 
-[^draft]: 浏览器编辑器的本地草稿只保存在当前设备和浏览器。导出文件并提交到仓库后，内容才会随站点更新公开。
+Before publishing, check the preview once: headings, links, code, and image descriptions deserve the same attention as the prose.
+
+[^draft]: Browser drafts stay on this device. Export and commit the file to publish it.

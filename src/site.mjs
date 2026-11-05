@@ -20,8 +20,8 @@ async function search(){
       const description=document.createElement('span');description.textContent=post.description;
       link.append(small,title,description);results.append(link);
     }
-    if(!matches.length){const empty=document.createElement('p');empty.className='search-empty';empty.textContent='没有找到这段记录，换一个关键词试试。';results.append(empty);}
-  }catch{results.textContent='搜索索引加载失败，请刷新页面重试。';}
+    if(!matches.length){const empty=document.createElement('p');empty.className='search-empty';empty.textContent='No matching notes.';results.append(empty);}
+  }catch{results.textContent='Search could not load. Please try again.';}
 }
 function openSearch(){focusBeforeSearch=document.activeElement;dialog.showModal();input.focus();search();}
 document.querySelectorAll('.search-trigger').forEach(button=>button.addEventListener('click',openSearch));
